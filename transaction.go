@@ -92,6 +92,14 @@ func (t *Transaction) Escape(raw string) string {
 	return t.db.Escape(raw)
 }
 
+func (t *Transaction) DocumentIterator(colname string) *DocumentIterator {
+	col := t.db.client.Collection(colname)
+
+	iter := t.ft.Documents(col)
+
+	return &DocumentIterator{iter}
+}
+
 func (t *Transaction) QueryIterator(colname string, attr string, comparison string, val string) *DocumentIterator {
 	col := t.db.client.Collection(colname)
 
