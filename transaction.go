@@ -119,9 +119,11 @@ func (t *Transaction) NextDocPath(iter *DocumentIterator, dval interface{}) (str
 		return "", err
 	}
 
-	err = dsnap.DataTo(dval)
-	if err != nil {
-		return "", err
+	if dval != nil {
+		err = dsnap.DataTo(dval)
+		if err != nil {
+			return "", err
+		}
 	}
 
 	return dsnap.Ref.Path, nil
