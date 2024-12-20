@@ -1,4 +1,4 @@
-module fsdb
+module github.com/tadhunt/fsdb
 
 go 1.23.4
 
