@@ -10,7 +10,7 @@ import (
 type DBConnection struct {
         log     logger.CompatLogWriter
 	project string
-	client  *firestore.Client
+	Client  *firestore.Client
 }
 
 type DocumentIterator struct {
@@ -38,14 +38,14 @@ func NewDBConnection(ctx context.Context, log logger.CompatLogWriter, project st
 	dbc := &DBConnection{
 		log:     log,
 		project: project,
-		client:  client,
+		Client:  client,
 	}
 
 	return dbc, nil
 }
 
 func (db *DBConnection) Add(ctx context.Context, docname string, dval interface{}) error {
-	dref := db.client.Doc(docname)
+	dref := db.Client.Doc(docname)
 	if dref == nil {
 		return db.log.ErrFmt("nil dref: bad docname '%s'?", docname)
 	}
@@ -61,7 +61,7 @@ func (db *DBConnection) Add(ctx context.Context, docname string, dval interface{
 }
 
 func (db *DBConnection) AddOrReplace(ctx context.Context, docname string, dval interface{}) error {
-	dref := db.client.Doc(docname)
+	dref := db.Client.Doc(docname)
 
 	wr, err := dref.Set(ctx, dval)
 	if err != nil {
@@ -74,7 +74,7 @@ func (db *DBConnection) AddOrReplace(ctx context.Context, docname string, dval i
 }
 
 func (db *DBConnection) Delete(ctx context.Context, docname string) error {
-	dref := db.client.Doc(docname)
+	dref := db.Client.Doc(docname)
 
 	_, err := dref.Delete(ctx)
 	if err != nil {
@@ -85,7 +85,7 @@ func (db *DBConnection) Delete(ctx context.Context, docname string) error {
 }
 
 func (db *DBConnection) Get(ctx context.Context, docname string, dval interface{}) error {
-	dref := db.client.Doc(docname)
+	dref := db.Client.Doc(docname)
 
 	dsnap, err := dref.Get(ctx)
 	if err != nil {
@@ -96,7 +96,7 @@ func (db *DBConnection) Get(ctx context.Context, docname string, dval interface{
 }
 
 func (db *DBConnection) QueryIterator(ctx context.Context, colname string, attr string, comparison string, val string) *DocumentIterator {
-	col := db.client.Collection(colname)
+	col := db.Client.Collection(colname)
 
 	query := col.Where(attr, comparison, val)
 
@@ -109,7 +109,7 @@ func (db *DBConnection) QueryIterator(ctx context.Context, colname string, attr 
  * Adds a new [automatically named] document to a collection group
  */
 func (db *DBConnection) CollectionGroupAdd(ctx context.Context, colname string, dval interface{}) error {
-	col := db.client.Collection(colname)
+	col := db.Client.Collection(colname)
 
 	dref := col.NewDoc()
 
@@ -124,7 +124,7 @@ func (db *DBConnection) CollectionGroupAdd(ctx context.Context, colname string, 
 }
 
 func (db *DBConnection) CollectionGroupQuery(ctx context.Context, colname string, wheres []*DbWhere) *DocumentIterator {
-	col := db.client.CollectionGroup(colname)
+	col := db.Client.CollectionGroup(colname)
 
 	var query firestore.Query
 
@@ -176,7 +176,7 @@ func (db *DBConnection) NextDocPath(ctx context.Context, iter *DocumentIterator,
 }
 
 func (db *DBConnection) DocumentIterator(ctx context.Context, path string) *DocumentIterator {
-	iter := db.client.Collection(path).Documents(ctx)
+	iter := db.Client.Collection(path).Documents(ctx)
 	if iter == nil {
 		return nil
 	}
@@ -185,7 +185,7 @@ func (db *DBConnection) DocumentIterator(ctx context.Context, path string) *Docu
 }
 
 func (db *DBConnection) CollectionIterator(ctx context.Context, docname string) *CollectionIterator {
-	iter := db.client.Doc(docname).Collections(ctx)
+	iter := db.Client.Doc(docname).Collections(ctx)
 	if iter == nil {
 		return nil
 	}

@@ -44,7 +44,7 @@ type DocumentChange struct {
 }
 
 func (db *DBConnection) DocListen(ctx context.Context, collection string, doc string, handler func(change *DocumentChange) error) error {
-	it := db.client.Collection(collection).Doc(doc).Snapshots(ctx)
+	it := db.Client.Collection(collection).Doc(doc).Snapshots(ctx)
 
 	for {
 		snap, err := it.Next()
@@ -81,7 +81,7 @@ func (db *DBConnection) CollectionListen(log logger.CompatLogWriter, ctx context
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	query := db.client.Collection(collection).Query
+	query := db.Client.Collection(collection).Query
 	if filter != nil {
 		switch filter.Op {
 		case "in":

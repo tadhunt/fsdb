@@ -21,7 +21,7 @@ func (db *DBConnection) RunTransaction(ctx context.Context, tfuncs ...Transactio
 		tfuncs: tfuncs,
 	}
 
-	return db.client.RunTransaction(ctx, transaction.handler)
+	return db.Client.RunTransaction(ctx, transaction.handler)
 }
 
 func (t *Transaction) handler(ctx context.Context, ft *firestore.Transaction) error {
@@ -38,7 +38,7 @@ func (t *Transaction) handler(ctx context.Context, ft *firestore.Transaction) er
 }
 
 func (t *Transaction) Add(docname string, dval interface{}) error {
-	dref := t.db.client.Doc(docname)
+	dref := t.db.Client.Doc(docname)
 	if dref == nil {
 		return fmt.Errorf("nil dref: bad docname '%s'?", docname)
 	}
@@ -54,7 +54,7 @@ func (t *Transaction) Add(docname string, dval interface{}) error {
 }
 
 func (t *Transaction) AddOrReplace(docname string, dval interface{}) error {
-	dref := t.db.client.Doc(docname)
+	dref := t.db.Client.Doc(docname)
 
 	err := t.ft.Set(dref, dval)
 	if err != nil {
@@ -67,7 +67,7 @@ func (t *Transaction) AddOrReplace(docname string, dval interface{}) error {
 }
 
 func (t *Transaction) Delete(docname string) error {
-	dref := t.db.client.Doc(docname)
+	dref := t.db.Client.Doc(docname)
 
 	err := t.ft.Delete(dref)
 	if err != nil {
@@ -78,7 +78,7 @@ func (t *Transaction) Delete(docname string) error {
 }
 
 func (t *Transaction) Get(docname string, dval interface{}) error {
-	dref := t.db.client.Doc(docname)
+	dref := t.db.Client.Doc(docname)
 
 	dsnap, err := t.ft.Get(dref)
 	if err != nil {
@@ -93,7 +93,7 @@ func (t *Transaction) Escape(raw string) string {
 }
 
 func (t *Transaction) DocumentIterator(colname string) *DocumentIterator {
-	col := t.db.client.Collection(colname)
+	col := t.db.Client.Collection(colname)
 
 	iter := t.ft.Documents(col)
 
@@ -101,7 +101,7 @@ func (t *Transaction) DocumentIterator(colname string) *DocumentIterator {
 }
 
 func (t *Transaction) QueryIterator(colname string, attr string, comparison string, val string) *DocumentIterator {
-	col := t.db.client.Collection(colname)
+	col := t.db.Client.Collection(colname)
 
 	query := col.Where(attr, comparison, val)
 
@@ -132,7 +132,7 @@ func (t *Transaction) NextDocPath(iter *DocumentIterator, dval interface{}) (str
 type DBCreateFunc func(ctx context.Context, dval interface{}) error
 
 func (db *DBConnection) AtomicGetOrCreate(ctx context.Context, docname string, dval interface{}, createfunc DBCreateFunc) error {
-	dref := db.client.Doc(docname)
+	dref := db.Client.Doc(docname)
 
 	txfunc := func(ctx context.Context, tx *firestore.Transaction) error {
 		dsnap, err := tx.Get(dref)
@@ -158,7 +158,7 @@ func (db *DBConnection) AtomicGetOrCreate(ctx context.Context, docname string, d
 		return nil
 	}
 
-	err := db.client.RunTransaction(ctx, txfunc)
+	err := db.Client.RunTransaction(ctx, txfunc)
 
 	if err != nil {
 		return err
@@ -170,7 +170,7 @@ func (db *DBConnection) AtomicGetOrCreate(ctx context.Context, docname string, d
 type DBUpdateFunc func(ctx context.Context, dval interface{}) error
 
 func (db *DBConnection) AtomicUpdate(ctx context.Context, docname string, dval interface{}, updateFunc DBUpdateFunc) error {
-	dref := db.client.Doc(docname)
+	dref := db.Client.Doc(docname)
 
 	txfunc := func(ctx context.Context, tx *firestore.Transaction) error {
 		dsnap, err := tx.Get(dref)
@@ -196,7 +196,7 @@ func (db *DBConnection) AtomicUpdate(ctx context.Context, docname string, dval i
 		return nil
 	}
 
-	err := db.client.RunTransaction(ctx, txfunc)
+	err := db.Client.RunTransaction(ctx, txfunc)
 
 	if err != nil {
 		return err
