@@ -29,7 +29,7 @@ type DbWhere struct {
 
 var DBIteratorDone = iterator.Done
 
-func NewDBConnection(log logger.CompatLogWriter, ctx context.Context, project string) (*DBConnection, error) {
+func NewDBConnection(ctx context.Context, log logger.CompatLogWriter, project string) (*DBConnection, error) {
 	client, err := firestore.NewClient(ctx, project)
 	if err != nil {
 		return nil, err
