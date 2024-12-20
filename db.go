@@ -2,8 +2,12 @@ package fsdb
 
 import (
 	"context"
+
 	"cloud.google.com/go/firestore"
+
 	"google.golang.org/api/iterator"
+	"google.golang.org/api/option"
+
 	"github.com/tadhunt/logger"
 )
 
@@ -29,8 +33,12 @@ type DbWhere struct {
 
 var DBIteratorDone = iterator.Done
 
-func NewDBConnection(ctx context.Context, log logger.CompatLogWriter, project string) (*DBConnection, error) {
-	client, err := firestore.NewClient(ctx, project)
+func NewDBConnection(ctx context.Context, log logger.CompatLogWriter, project string, credentialsFile string) (*DBConnection, error) {
+	options := []option.ClientOption{
+		option.WithCredentialsFile(credentialsFile),
+	}
+
+	client, err := firestore.NewClient(ctx, project, options...)
 	if err != nil {
 		return nil, err
 	}
