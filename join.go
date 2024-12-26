@@ -1,7 +1,6 @@
 package fsdb
 
 import (
-	"context"
 	"bytes"
 	"crypto/rand"
 	"fmt"
@@ -28,11 +27,11 @@ func NewJoinCodeManager(id string) *JoinCodeManager {
 	}
 }
 
-func (jcm *JoinCodeManager) LookupByCode(ctx context.Context, db *DBConnection, code string, data *any) error {
+func (jcm *JoinCodeManager) LookupByCode(t *Transaction, code string, data *any) error {
 	dbpath := fmt.Sprintf("joincodes-bycode/%s", code)
 
 	jc := &JoinCode{}
-	err := db.Get(ctx, dbpath, jc)
+	err := t.Get(dbpath, jc)
 	if err != nil {
 		if ErrorIsNotFound(err) {
 			return nil
@@ -45,11 +44,11 @@ func (jcm *JoinCodeManager) LookupByCode(ctx context.Context, db *DBConnection, 
 	return nil
 }
 
-func (jcm *JoinCodeManager) LookupByUID(ctx context.Context, db DBConnection, uid string) (*JoinCode, error) {
+func (jcm *JoinCodeManager) LookupByUID(t *Transaction, uid string) (*JoinCode, error) {
 	dbpath := fmt.Sprintf("joincodes-byname/%s_%s", jcm.ID, uid)
 
 	jc := &JoinCode{}
-	err := db.Get(ctx, dbpath, jc)
+	err := t.Get(dbpath, jc)
 	if err != nil {
 		if ErrorIsNotFound(err) {
 			return nil, nil
@@ -60,112 +59,63 @@ func (jcm *JoinCodeManager) LookupByUID(ctx context.Context, db DBConnection, ui
 	return jc, nil
 }
 
-func (jcm *JoinCodeManager) LookupOrCreate(ctx context.Context, db *DBConnection, uid string) (*JoinCode, error) {
+func (jcm *JoinCodeManager) Create(t *Transaction, uid string, data any) (*JoinCode, error) {
 	jc := &JoinCode{}
 
-	err := db.RunTransaction(ctx, func(ctx context.Context, t *Transaction) error {
-		byNamePath := fmt.Sprintf("joincodes-byname/%s_%s", jcm.ID, uid)
-
-		err := t.Get(byNamePath, jc)
-		if err == nil {
-			return nil
-		}
-		if !ErrorIsNotFound(err) {
-			return err
+	for i := 0; i < 20; i++ {
+		code, err := newJoinCode()
+		if err != nil {
+			return nil, err
 		}
 
-		for i := 0; i < 20; i++ {
-			code, err := newJoinCode()
-			if err != nil {
-				return err
-			}
+		jc.Code = code
+		jc.MgrID = jcm.ID
+		jc.UID = uid
 
-			jc.Code = code
-			jc.MgrID = jcm.ID
-			jc.UID = uid
+		byCodePath := fmt.Sprintf("joincodes-bycode/%s", jc.Code)
 
-			byCodePath := fmt.Sprintf("joincodes-bycode/%s", jc.Code)
-
-			err = t.Add(byCodePath, jc)
-			if err != nil {
-				if ErrorIsAlreadyExists(err) {
-					continue
-				}
-				return err
-			}
-
-			err = t.Add(byNamePath, jc)
-			if err != nil {
-				return err
-			}
-		}
-		return fmt.Errorf("failed to generate a unique join code")
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return jc, nil
-}
-
-func (jcm *JoinCodeManager) JoinCodeDeleteByUID(ctx context.Context, db *DBConnection, uid string) error {
-	err := db.RunTransaction(ctx, func(ctx context.Context, t *Transaction) error {
-		byNamePath := fmt.Sprintf("joincodes-byname/%s_%s", jcm.ID, uid)
-
-		jc := &JoinCode{}
-		err := t.Get(byNamePath, jc)
+		tmpjc := &JoinCode{}
+		err = t.Get(byCodePath, tmpjc)
 		if err != nil {
 			if ErrorIsNotFound(err) {
-				return nil
+				return jc, nil
 			}
+			return nil, err
+		}
+
+		// duplicate code: try again with another code
+	}
+
+	return nil, fmt.Errorf("failed to generate a unique join code")
+}
+
+func (jc *JoinCode) Save(t *Transaction) error {
+	paths := []string{
+		fmt.Sprintf("joincodes-byname/%s_%s", jc.MgrID, jc.UID),
+		fmt.Sprintf("joincodes-bycode/%s", jc.Code),
+	}
+
+	for _, path := range paths {
+		err := t.AddOrReplace(path, jc)
+		if err != nil {
 			return err
 		}
-
-		dbpaths := []string{
-			byNamePath,
-			fmt.Sprintf("joincodes-bycode/%s", jc.Code),
-		}
-
-		for _, path := range dbpaths {
-			err := t.Delete(path)
-			if err != nil {
-				if ErrorIsNotFound(err) {
-					continue
-				}
-				return err
-			}
-		}
-
-		return nil
-	})
-	if err != nil {
-		return err
 	}
 
 	return nil
 }
 
-func (jcm *JoinCodeManager) JoinCodeDelete(ctx context.Context, db *DBConnection, jc *JoinCode) error {
-	err := db.RunTransaction(ctx, func(ctx context.Context, t *Transaction) error {
-		dbpaths := []string{
-			fmt.Sprintf("joincodes-byname/%s_%s", jc.MgrID, jc.UID),
-			fmt.Sprintf("joincodes-bycode/%s", jc.Code),
-		}
+func (jc *JoinCode) Delete(t *Transaction) error {
+	paths := []string{
+		fmt.Sprintf("joincodes-byname/%s_%s", jc.MgrID, jc.UID),
+		fmt.Sprintf("joincodes-bycode/%s", jc.Code),
+	}
 
-		for _, path := range dbpaths {
-			err := t.Delete(path)
-			if err != nil {
-				if ErrorIsNotFound(err) {
-					continue
-				}
-				return err
-			}
+	for _, path := range paths {
+		err := t.Delete(path)
+		if err != nil {
+			return err
 		}
-
-		return nil
-	})
-	if err != nil {
-		return err
 	}
 
 	return nil
