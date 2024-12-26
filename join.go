@@ -11,8 +11,8 @@ const (
 	JoinCodeCharacters = "0123456789"
 )
 
-type JoinCodeManager struct {
-	ID string
+type JoinCodeManager interface {
+	JoinCodeManagerID() string
 }
 
 type JoinCode struct {
@@ -22,13 +22,7 @@ type JoinCode struct {
 	Data  map[string]any
 }
 
-func NewJoinCodeManager(id string) *JoinCodeManager {
-	return &JoinCodeManager{
-		ID: id,
-	}
-}
-
-func (jcm *JoinCodeManager) LookupByCode(t *Transaction, code string) (*JoinCode, error) {
+func JoinCodeLookupByCode(t *Transaction, code string) (*JoinCode, error) {
 	dbpath := fmt.Sprintf("joincodes-bycode/%s", code)
 
 	jc := &JoinCode{}
@@ -40,8 +34,8 @@ func (jcm *JoinCodeManager) LookupByCode(t *Transaction, code string) (*JoinCode
 	return jc, nil
 }
 
-func (jcm *JoinCodeManager) LookupByUID(t *Transaction, uid string) (*JoinCode, error) {
-	dbpath := fmt.Sprintf("joincodes-byname/%s_%s", jcm.ID, uid)
+func JoinCodeLookupByUID(jcm JoinCodeManager, t *Transaction, uid string) (*JoinCode, error) {
+	dbpath := fmt.Sprintf("joincodes-byname/%s_%s", jcm.JoinCodeManagerID(), uid)
 
 	jc := &JoinCode{}
 	err := t.Get(dbpath, jc)
@@ -55,7 +49,7 @@ func (jcm *JoinCodeManager) LookupByUID(t *Transaction, uid string) (*JoinCode, 
 	return jc, nil
 }
 
-func (jcm *JoinCodeManager) Create(t *Transaction, uid string, data map[string]any) (*JoinCode, error) {
+func JoinCodeCreate(jcm JoinCodeManager, t *Transaction, uid string, data map[string]any) (*JoinCode, error) {
 	jc := &JoinCode{}
 
 	for i := 0; i < 20; i++ {
@@ -65,7 +59,7 @@ func (jcm *JoinCodeManager) Create(t *Transaction, uid string, data map[string]a
 		}
 
 		jc.Code = code
-		jc.MgrID = jcm.ID
+		jc.MgrID = jcm.JoinCodeManagerID()
 		jc.UID = uid
 		jc.Data = data
 
