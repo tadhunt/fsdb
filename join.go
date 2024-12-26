@@ -18,7 +18,7 @@ type JoinCode struct {
 	Code  string
 	MgrID string
 	UID   string
-	Data  any
+	Data  map[string]any
 }
 
 func NewJoinCodeManager(id string) *JoinCodeManager {
@@ -27,21 +27,16 @@ func NewJoinCodeManager(id string) *JoinCodeManager {
 	}
 }
 
-func (jcm *JoinCodeManager) LookupByCode(t *Transaction, code string, data *any) error {
+func (jcm *JoinCodeManager) LookupByCode(t *Transaction, code string) (*JoinCode, error) {
 	dbpath := fmt.Sprintf("joincodes-bycode/%s", code)
 
 	jc := &JoinCode{}
 	err := t.Get(dbpath, jc)
 	if err != nil {
-		if ErrorIsNotFound(err) {
-			return nil
-		}
-		return err
+		return nil, err
 	}
 
-	*data = jc.Data
-
-	return nil
+	return jc, nil
 }
 
 func (jcm *JoinCodeManager) LookupByUID(t *Transaction, uid string) (*JoinCode, error) {
@@ -59,7 +54,7 @@ func (jcm *JoinCodeManager) LookupByUID(t *Transaction, uid string) (*JoinCode, 
 	return jc, nil
 }
 
-func (jcm *JoinCodeManager) Create(t *Transaction, uid string, data any) (*JoinCode, error) {
+func (jcm *JoinCodeManager) Create(t *Transaction, uid string, data map[string]any) (*JoinCode, error) {
 	jc := &JoinCode{}
 
 	for i := 0; i < 20; i++ {
@@ -71,6 +66,7 @@ func (jcm *JoinCodeManager) Create(t *Transaction, uid string, data any) (*JoinC
 		jc.Code = code
 		jc.MgrID = jcm.ID
 		jc.UID = uid
+		jc.Data = data
 
 		byCodePath := fmt.Sprintf("joincodes-bycode/%s", jc.Code)
 
