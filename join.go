@@ -3,6 +3,7 @@ package fsdb
 import (
 	"bytes"
 	"crypto/rand"
+	"errors"
 	"fmt"
 )
 const (
@@ -134,4 +135,27 @@ func newJoinCode() (string, error) {
 	}
 
 	return buf.String(), nil
+}
+
+
+func ListJoinCodes(t *Transaction) ([]*JoinCode, error) {
+	joincodes := make([]*JoinCode, 0)
+
+	iter := t.DocumentIterator("joincodes-bycode")
+
+	defer iter.Stop()
+	for {
+		jc := &JoinCode{}
+		_, err := t.NextDocPath(iter, jc)
+		if err != nil {
+			if errors.Is(err, DBIteratorDone) {
+				break
+			}
+			return nil, err
+		}
+
+		joincodes = append(joincodes, jc)
+	}
+
+	return joincodes, nil
 }
