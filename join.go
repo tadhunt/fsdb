@@ -11,10 +11,6 @@ const (
 	JoinCodeCharacters = "0123456789"
 )
 
-type JoinCodeManager interface {
-	JoinCodeManagerID() string
-}
-
 type JoinCode struct {
 	Code  string
 	MgrID string
@@ -34,8 +30,8 @@ func JoinCodeLookupByCode(t *Transaction, code string) (*JoinCode, error) {
 	return jc, nil
 }
 
-func JoinCodeLookupByUID(jcm JoinCodeManager, t *Transaction, uid string) (*JoinCode, error) {
-	dbpath := fmt.Sprintf("joincodes-byname/%s_%s", jcm.JoinCodeManagerID(), uid)
+func JoinCodeLookupByUID(mgrid string, t *Transaction, uid string) (*JoinCode, error) {
+	dbpath := fmt.Sprintf("joincodes-byname/%s_%s", mgrid, uid)
 
 	jc := &JoinCode{}
 	err := t.Get(dbpath, jc)
@@ -49,7 +45,7 @@ func JoinCodeLookupByUID(jcm JoinCodeManager, t *Transaction, uid string) (*Join
 	return jc, nil
 }
 
-func JoinCodeCreate(jcm JoinCodeManager, t *Transaction, uid string, data map[string]any) (*JoinCode, error) {
+func JoinCodeCreate(mgrid string, t *Transaction, uid string, data map[string]any) (*JoinCode, error) {
 	jc := &JoinCode{}
 
 	for i := 0; i < 20; i++ {
@@ -59,7 +55,7 @@ func JoinCodeCreate(jcm JoinCodeManager, t *Transaction, uid string, data map[st
 		}
 
 		jc.Code = code
-		jc.MgrID = jcm.JoinCodeManagerID()
+		jc.MgrID = mgrid
 		jc.UID = uid
 		jc.Data = data
 
