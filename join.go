@@ -15,7 +15,7 @@ type JoinCode struct {
 	Code  string
 	MgrID string
 	UID   string
-	Data  map[string]any
+	Data  map[string]string
 }
 
 func JoinCodeLookupByCode(t *Transaction, code string) (*JoinCode, error) {
@@ -45,7 +45,7 @@ func JoinCodeLookupByUID(mgrid string, t *Transaction, uid string) (*JoinCode, e
 	return jc, nil
 }
 
-func JoinCodeCreate(mgrid string, t *Transaction, uid string, data map[string]any) (*JoinCode, error) {
+func JoinCodeCreate(mgrid string, t *Transaction, uid string, data map[string]string) (*JoinCode, error) {
 	jc := &JoinCode{}
 
 	for i := 0; i < 20; i++ {
