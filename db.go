@@ -52,6 +52,25 @@ func NewDBConnection(ctx context.Context, log logger.CompatLogWriter, project st
 	return dbc, nil
 }
 
+func NewDBConnectionWithDatabase(ctx context.Context, log logger.CompatLogWriter, project string, dbID string, credentialsFile string) (*DBConnection, error) {
+	options := []option.ClientOption{
+		option.WithCredentialsFile(credentialsFile),
+	}
+
+	client, err := firestore.NewClientWithDatabase(ctx, project, dbID, options...)
+	if err != nil {
+		return nil, err
+	}
+
+	dbc := &DBConnection{
+		log:     log,
+		project: project,
+		Client:  client,
+	}
+
+	return dbc, nil
+}
+
 func (db *DBConnection) Add(ctx context.Context, docname string, dval interface{}) error {
 	dref := db.Client.Doc(docname)
 	if dref == nil {
