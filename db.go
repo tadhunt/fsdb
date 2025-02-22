@@ -33,9 +33,17 @@ type DbWhere struct {
 
 var DBIteratorDone = iterator.Done
 
-func NewDBConnection(ctx context.Context, log logger.CompatLogWriter, project string, credentialsFile string) (*DBConnection, error) {
-	options := []option.ClientOption{
-		option.WithCredentialsFile(credentialsFile),
+type Credentials struct {
+	File *string
+	JSON []byte
+}
+
+func NewDBConnection(ctx context.Context, log logger.CompatLogWriter, project string, credentials *Credentials) (*DBConnection, error) {
+	options := []option.ClientOption{}
+	if credentials.File != nil {
+		options = append(options, option.WithCredentialsFile(*credentials.File))
+	} else if credentials.JSON != nil {
+		options = append(options, option.WithCredentialsJSON(credentials.JSON))
 	}
 
 	client, err := firestore.NewClient(ctx, project, options...)
@@ -52,9 +60,12 @@ func NewDBConnection(ctx context.Context, log logger.CompatLogWriter, project st
 	return dbc, nil
 }
 
-func NewDBConnectionWithDatabase(ctx context.Context, log logger.CompatLogWriter, project string, dbID string, credentialsFile string) (*DBConnection, error) {
-	options := []option.ClientOption{
-		option.WithCredentialsFile(credentialsFile),
+func NewDBConnectionWithDatabase(ctx context.Context, log logger.CompatLogWriter, project string, dbID string, credentials *Credentials) (*DBConnection, error) {
+	options := []option.ClientOption{}
+	if credentials.File != nil {
+		options = append(options, option.WithCredentialsFile(*credentials.File))
+	} else if credentials.JSON != nil {
+		options = append(options, option.WithCredentialsJSON(credentials.JSON))
 	}
 
 	client, err := firestore.NewClientWithDatabase(ctx, project, dbID, options...)
