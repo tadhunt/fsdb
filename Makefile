@@ -1,3 +1,5 @@
+include ./secrets/config.mk
+
 all:
 	go mod tidy
 	go vet
@@ -6,3 +8,6 @@ all:
 clean:
 	go clean -modcache
 	go mod tidy
+
+test: all
+	go test -count=1 ./...

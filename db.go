@@ -2,6 +2,10 @@ package fsdb
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"os/exec"
+	"strings"
 
 	"cloud.google.com/go/firestore"
 
@@ -34,8 +38,9 @@ type DbWhere struct {
 var DBIteratorDone = iterator.Done
 
 type Credentials struct {
-	File *string
-	JSON []byte
+	File          *string
+	JSON          []byte
+	AccessTokenFile *string
 }
 
 func NewDBConnection(ctx context.Context, log logger.CompatLogWriter, project string, credentials *Credentials) (*DBConnection, error) {
@@ -276,4 +281,67 @@ func (db *DBConnection) Unescape(s string) string {
 	}
 
 	return r
+}
+
+func CreateDatabase(ctx context.Context, log logger.CompatLogWriter, project string, dbID string, credentials *Credentials) ([]string, error) {
+	exists, err := dbExists(ctx, log, project, dbID, credentials)
+	if err != nil {
+		return nil, err
+	}
+	if exists {
+		return nil, errors.New("database " + dbID + " already exists")
+	}
+
+	path, err := exec.LookPath("gcloud")
+	if err != nil {
+		return nil, err
+	}
+
+	if credentials.AccessTokenFile == nil {
+		return nil, errors.New("missing access token file")
+	}
+
+	cmd := exec.Command(path,
+		"--access-token-file=" + *credentials.AccessTokenFile,
+		"--project=" + project,
+		"firestore",
+		"databases",
+		"create",
+		"--database=" + dbID,
+		"--location=nam5",
+		"--type=firestore-native",
+	)
+
+	output, err := cmd.CombinedOutput()
+	lines := strings.Split(string(output), "\n")
+
+	return lines, err
+}
+
+func dbExists(ctx context.Context, log logger.CompatLogWriter, project string, dbID string, credentials *Credentials) (bool, error) {
+	c, err := NewDBConnectionWithDatabase(ctx, log, project, dbID, credentials)
+	if err != nil {
+		return false, err
+	}
+
+	nFound := 0
+	iter := c.Client.Collections(ctx)
+	for {
+		_, err := iter.Next()
+		if err == iterator.Done {
+			break // No more collections
+		}
+		if err != nil {
+			log.Errorf("%v", err)
+			errstr := fmt.Sprintf("%v", err)
+			match := fmt.Sprintf("database %s does not exist", dbID)
+			if strings.Contains(errstr, match) {
+				return false, nil
+			}
+			return false, err
+		}
+		nFound++
+	}
+
+	return true, nil
 }
