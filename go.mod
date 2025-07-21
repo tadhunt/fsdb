@@ -5,6 +5,7 @@ go 1.23.4
 require (
 	cloud.google.com/go/firestore v1.17.0
 	github.com/tadhunt/logger v0.0.0-20240319184922-7a0408f863ee
+	github.com/tadhunt/retry v0.0.0-20201126032642-04f0ec3feb8d
 	google.golang.org/api v0.214.0
 	google.golang.org/grpc v1.69.2
 )

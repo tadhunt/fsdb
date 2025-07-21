@@ -75,6 +75,8 @@ github.com/stretchr/testify v1.9.0 h1:HtqpIVDClZ4nwg75+f6Lvsy/wHu+3BoSGCbBAcpTsT
 github.com/stretchr/testify v1.9.0/go.mod h1:r2ic/lqez/lEtzL7wO/rwa5dbSLXVDPFyf8C91i36aY=
 github.com/tadhunt/logger v0.0.0-20240319184922-7a0408f863ee h1:wXPAAMhfsu/4Oiq7ZqRzLhAy4PeVJckD4fAMKA/W+JU=
 github.com/tadhunt/logger v0.0.0-20240319184922-7a0408f863ee/go.mod h1:OZm5UFVSZf2pneFBtT6Hz/XS5YG2NN7/dItvGIaxZhY=
+github.com/tadhunt/retry v0.0.0-20201126032642-04f0ec3feb8d h1:Yvog5mptWwUyssmzriwOCq8WbZfRbeIFrtMDtooTiQc=
+github.com/tadhunt/retry v0.0.0-20201126032642-04f0ec3feb8d/go.mod h1:3T74U1ioKW4Tv87NV6n22M08Mfjrz/tl3fvmaWmc83E=
 go.opencensus.io v0.24.0 h1:y73uSU6J157QMP2kn2r30vwW1A2W2WFwSCGnAVxeaD0=
 go.opencensus.io v0.24.0/go.mod h1:vNK8G9p7aAivkbmorf4v+7Hgx+Zs0yY+0fOtgBfjQKo=
 go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.54.0 h1:r6I7RJCN86bpD/FQwedZ0vSixDpwuWREjW9oRMsmqDc=

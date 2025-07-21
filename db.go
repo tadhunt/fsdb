@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+	"time"
 
 	"cloud.google.com/go/firestore"
 
@@ -13,6 +14,7 @@ import (
 	"google.golang.org/api/option"
 
 	"github.com/tadhunt/logger"
+	"github.com/tadhunt/retry"
 )
 
 type DBConnection struct {
@@ -315,7 +317,44 @@ func CreateDatabase(ctx context.Context, log logger.CompatLogWriter, project str
 	output, err := cmd.CombinedOutput()
 	lines := strings.Split(string(output), "\n")
 
+	if err != nil {
+		return lines, err
+	}
+
+	exists, err = dbExistsRetry(ctx, log, project, dbID, credentials)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.New("database " + dbID + " creation failed or is delayed")
+	}
+
 	return lines, err
+}
+
+func dbExistsRetry(ctx context.Context, log logger.CompatLogWriter, project string, dbID string, credentials *Credentials) (bool, error) {
+	var errFound = errors.New("found")
+	var errNotFound = errors.New("not found")
+
+	retrier := retry.NewRetrier(5, 0, 2*time.Second)
+
+	err := retrier.RunContext(ctx, func(ctx context.Context) error {
+		found, err := dbExists(ctx, log, project, dbID, credentials)
+		if err != nil {
+			return retry.Stop(err)
+		}
+		if !found {
+			return errNotFound
+		}
+
+		return retry.Stop(errFound)
+	})
+
+	if errors.Is(err, errFound) {
+		return true, nil 
+	}
+
+	return false, err
 }
 
 func dbExists(ctx context.Context, log logger.CompatLogWriter, project string, dbID string, credentials *Credentials) (bool, error) {
