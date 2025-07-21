@@ -332,7 +332,7 @@ func dbExists(ctx context.Context, log logger.CompatLogWriter, project string, d
 			break // No more collections
 		}
 		if err != nil {
-			log.Errorf("%v", err)
+			log.Debugf("%v", err)
 			errstr := fmt.Sprintf("%v", err)
 			match := fmt.Sprintf("database %s does not exist", dbID)
 			if strings.Contains(errstr, match) {
