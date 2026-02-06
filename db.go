@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/firestore"
+	"cloud.google.com/go/firestore/apiv1/firestorepb"
 
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
@@ -129,6 +130,25 @@ func (db *DBConnection) Delete(ctx context.Context, docname string) error {
 	return nil
 }
 
+func (db *DBConnection) DeleteCollection(ctx context.Context, path string) error {
+	col := db.Client.Collection(path)
+	iter := col.Select().Documents(ctx)
+	defer iter.Stop()
+
+	docs, err := iter.GetAll()
+	if err != nil {
+		return err
+	}
+	for _, doc := range docs {
+		_, err := doc.Ref.Delete(ctx)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (db *DBConnection) Get(ctx context.Context, docname string, dval interface{}) error {
 	dref := db.Client.Doc(docname)
 
@@ -236,6 +256,24 @@ func (db *DBConnection) CollectionIterator(ctx context.Context, docname string) 
 	}
 
 	return &CollectionIterator{iter}
+}
+
+// DocumentCount returns the number of documents in a collection using an aggregation query
+func (db *DBConnection) DocumentCount(ctx context.Context, path string) (int64, error) {
+	col := db.Client.Collection(path)
+	result, err := col.NewAggregationQuery().WithCount("count").Get(ctx)
+	if err != nil {
+		return 0, db.log.ErrFmt("count aggregation failed: %w", err)
+	}
+	val, ok := result["count"]
+	if !ok {
+		return 0, db.log.ErrFmt("count field not found in aggregation result")
+	}
+	count, ok := val.(*firestorepb.Value)
+	if !ok {
+		return 0, db.log.ErrFmt("unexpected count type: %T", val)
+	}
+	return count.GetIntegerValue(), nil
 }
 
 func (db *DBConnection) Escape(raw string) string {

@@ -110,6 +110,23 @@ func (t *Transaction) QueryIterator(colname string, attr string, comparison stri
 	return &DocumentIterator{iter}
 }
 
+func (t *Transaction) CompoundQueryIterator(colname string, wheres []*DbWhere) *DocumentIterator {
+	col := t.db.Client.Collection(colname)
+
+	var query firestore.Query
+	for i, w := range wheres {
+		if i == 0 {
+			query = col.Where(w.Attr, w.Comparison, w.Val)
+		} else {
+			query = query.Where(w.Attr, w.Comparison, w.Val)
+		}
+	}
+
+	iter := t.ft.Documents(query)
+
+	return &DocumentIterator{iter}
+}
+
 func (t *Transaction) NextDocPath(iter *DocumentIterator, dval interface{}) (string, error) {
 	dsnap, err := iter.Next()
 	if err == iterator.Done {
@@ -127,6 +144,25 @@ func (t *Transaction) NextDocPath(iter *DocumentIterator, dval interface{}) (str
 	}
 
 	return dsnap.Ref.Path, nil
+}
+
+func (t *Transaction) DeleteCollection(path string) error {
+	col := t.db.Client.Collection(path)
+	iter := t.ft.Documents(col.Select())
+	defer iter.Stop()
+
+	docIDs, err := iter.GetAll()
+	if err != nil {
+		return err
+	}
+	for _, doc := range docIDs {
+		err := t.ft.Delete(doc.Ref)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 type DBCreateFunc func(ctx context.Context, dval interface{}) error
