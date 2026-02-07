@@ -89,11 +89,11 @@ func (db *DBConnection) CollectionListen(log logger.CompatLogWriter, ctx context
 		case "not-in":
 			a, ok := filter.Value.([]string)
 			if !ok {
-				return fmt.Errorf("Filter %#v: Filter.Value must be []string", *filter) // TODO(tadhunt): maybe not true, but good enough for my usage for now
+				return fmt.Errorf("filter %#v: Filter.Value must be []string", *filter) // TODO(tadhunt): maybe not true, but good enough for my usage for now
 			}
 			if len(a) > 10 {
 				// According to https://firebase.google.com/docs/firestore/query-data/queries#in_not-in_and_array-contains-any
-				return fmt.Errorf("Filter %#v: too many values, 10 max", *filter)
+				return fmt.Errorf("filter %#v: too many values, 10 max", *filter)
 			}
 		}
 

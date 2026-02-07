@@ -3,6 +3,7 @@ include ./secrets/config.mk
 all:
 	go mod tidy
 	go vet
+	staticcheck
 	go build
 
 clean:

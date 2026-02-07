@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"cloud.google.com/go/firestore"
 	"cloud.google.com/go/firestore/apiv1/firestorepb"
 
+	"golang.org/x/oauth2/google"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 
@@ -46,12 +48,35 @@ type Credentials struct {
 	AccessTokenFile *string
 }
 
-func NewDBConnection(ctx context.Context, log logger.CompatLogWriter, project string, credentials *Credentials) (*DBConnection, error) {
-	options := []option.ClientOption{}
+func credentialOptions(ctx context.Context, credentials *Credentials) ([]option.ClientOption, error) {
+	var jsonBytes []byte
+
 	if credentials.File != nil {
-		options = append(options, option.WithCredentialsFile(*credentials.File))
+		data, err := os.ReadFile(*credentials.File)
+		if err != nil {
+			return nil, err
+		}
+		jsonBytes = data
 	} else if credentials.JSON != nil {
-		options = append(options, option.WithCredentialsJSON(credentials.JSON))
+		jsonBytes = credentials.JSON
+	}
+
+	if jsonBytes == nil {
+		return nil, nil
+	}
+
+	creds, err := google.CredentialsFromJSON(ctx, jsonBytes, "https://www.googleapis.com/auth/cloud-platform")
+	if err != nil {
+		return nil, err
+	}
+
+	return []option.ClientOption{option.WithCredentials(creds)}, nil
+}
+
+func NewDBConnection(ctx context.Context, log logger.CompatLogWriter, project string, credentials *Credentials) (*DBConnection, error) {
+	options, err := credentialOptions(ctx, credentials)
+	if err != nil {
+		return nil, err
 	}
 
 	client, err := firestore.NewClient(ctx, project, options...)
@@ -69,11 +94,9 @@ func NewDBConnection(ctx context.Context, log logger.CompatLogWriter, project st
 }
 
 func NewDBConnectionWithDatabase(ctx context.Context, log logger.CompatLogWriter, project string, dbID string, credentials *Credentials) (*DBConnection, error) {
-	options := []option.ClientOption{}
-	if credentials.File != nil {
-		options = append(options, option.WithCredentialsFile(*credentials.File))
-	} else if credentials.JSON != nil {
-		options = append(options, option.WithCredentialsJSON(credentials.JSON))
+	options, err := credentialOptions(ctx, credentials)
+	if err != nil {
+		return nil, err
 	}
 
 	client, err := firestore.NewClientWithDatabase(ctx, project, dbID, options...)
