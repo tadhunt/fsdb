@@ -93,6 +93,16 @@ func NewDBConnection(ctx context.Context, log logger.CompatLogWriter, project st
 	return dbc, nil
 }
 
+// NewDBConnectionFromClient creates a DBConnection from an existing firestore.Client.
+// This is useful for sharing a client between different database wrappers.
+func NewDBConnectionFromClient(log logger.CompatLogWriter, project string, client *firestore.Client) *DBConnection {
+	return &DBConnection{
+		log:     log,
+		project: project,
+		Client:  client,
+	}
+}
+
 func NewDBConnectionWithDatabase(ctx context.Context, log logger.CompatLogWriter, project string, dbID string, credentials *Credentials) (*DBConnection, error) {
 	options, err := credentialOptions(ctx, credentials)
 	if err != nil {
