@@ -1,18 +1,46 @@
 package fsdb
 
 import (
-	"cloud.google.com/go/firestore"
-	"google.golang.org/api/iterator"
+	"container/list"
 	"context"
 	"fmt"
+
+	"cloud.google.com/go/firestore"
+	"google.golang.org/api/iterator"
 )
 
 type TransactionFunc func(ctx context.Context, t *Transaction) error
+
+// cachedRead memoizes a single Firestore document read within a transaction.
+// A non-nil err (e.g. ErrorIsNotFound) is cached just like a successful read.
+type cachedRead struct {
+	snap *firestore.DocumentSnapshot
+	err  error
+}
+
+type cacheEntry struct {
+	docpath string
+	value   cachedRead
+}
+
+// transactionCacheMax caps the per-transaction read cache. Sized so that
+// worst-case memory under high concurrency stays within a Cloud Run
+// instance's typical RAM: ~50KB/doc × 64 entries × 80 concurrent ≈ 250MB.
+const transactionCacheMax = 64
 
 type Transaction struct {
 	db     *DBConnection
 	ft     *firestore.Transaction
 	tfuncs []TransactionFunc
+
+	// Per-attempt LRU read cache keyed by DocumentRef.Path. Firestore
+	// disallows reads after writes within a transaction, so writes only
+	// need to invalidate defensively. Reset on every handler invocation
+	// so retries see a fresh view.
+	cache       map[string]*list.Element
+	cacheOrder  *list.List
+	cacheHits   int
+	cacheMisses int
 }
 
 func (db *DBConnection) RunTransaction(ctx context.Context, tfuncs ...TransactionFunc) error {
@@ -26,6 +54,10 @@ func (db *DBConnection) RunTransaction(ctx context.Context, tfuncs ...Transactio
 
 func (t *Transaction) handler(ctx context.Context, ft *firestore.Transaction) error {
 	t.ft = ft
+	t.cache = make(map[string]*list.Element, transactionCacheMax)
+	t.cacheOrder = list.New()
+	t.cacheHits = 0
+	t.cacheMisses = 0
 
 	for _, tfunc := range t.tfuncs {
 		err := tfunc(ctx, t)
@@ -35,6 +67,45 @@ func (t *Transaction) handler(ctx context.Context, ft *firestore.Transaction) er
 	}
 
 	return nil
+}
+
+// cacheLookup returns the cached read for docpath and marks it most-recent.
+func (t *Transaction) cacheLookup(docpath string) (cachedRead, bool) {
+	elem, ok := t.cache[docpath]
+	if !ok {
+		return cachedRead{}, false
+	}
+	t.cacheOrder.MoveToFront(elem)
+	return elem.Value.(*cacheEntry).value, true
+}
+
+// cacheStore inserts or refreshes a cache entry, evicting the LRU entry if
+// the cache is over capacity.
+func (t *Transaction) cacheStore(docpath string, val cachedRead) {
+	if elem, ok := t.cache[docpath]; ok {
+		elem.Value.(*cacheEntry).value = val
+		t.cacheOrder.MoveToFront(elem)
+		return
+	}
+	elem := t.cacheOrder.PushFront(&cacheEntry{docpath: docpath, value: val})
+	t.cache[docpath] = elem
+
+	for t.cacheOrder.Len() > transactionCacheMax {
+		oldest := t.cacheOrder.Back()
+		if oldest == nil {
+			break
+		}
+		delete(t.cache, oldest.Value.(*cacheEntry).docpath)
+		t.cacheOrder.Remove(oldest)
+	}
+}
+
+// cacheEvict removes an entry from the cache if present.
+func (t *Transaction) cacheEvict(docpath string) {
+	if elem, ok := t.cache[docpath]; ok {
+		t.cacheOrder.Remove(elem)
+		delete(t.cache, docpath)
+	}
 }
 
 func (t *Transaction) Add(docname string, dval interface{}) error {
@@ -48,6 +119,7 @@ func (t *Transaction) Add(docname string, dval interface{}) error {
 		return err
 	}
 
+	t.cacheEvict(dref.Path)
 	t.db.log.Debugf("docname %s dval %#v", docname, dval)
 
 	return nil
@@ -61,6 +133,7 @@ func (t *Transaction) AddOrReplace(docname string, dval interface{}) error {
 		return err
 	}
 
+	t.cacheEvict(dref.Path)
 	t.db.log.Debugf("docname %s", docname)
 
 	return nil
@@ -74,13 +147,27 @@ func (t *Transaction) Delete(docname string) error {
 		return err
 	}
 
+	t.cacheEvict(dref.Path)
 	return nil
 }
 
 func (t *Transaction) Get(docname string, dval interface{}) error {
 	dref := t.db.Client.Doc(docname)
+	if dref == nil {
+		return fmt.Errorf("nil dref: bad docname '%s'?", docname)
+	}
+
+	if c, ok := t.cacheLookup(dref.Path); ok {
+		t.cacheHits++
+		if c.err != nil {
+			return c.err
+		}
+		return c.snap.DataTo(dval)
+	}
+	t.cacheMisses++
 
 	dsnap, err := t.ft.Get(dref)
+	t.cacheStore(dref.Path, cachedRead{snap: dsnap, err: err})
 	if err != nil {
 		return err
 	}
@@ -136,6 +223,8 @@ func (t *Transaction) NextDocPath(iter *DocumentIterator, dval interface{}) (str
 		return "", err
 	}
 
+	t.cacheStore(dsnap.Ref.Path, cachedRead{snap: dsnap})
+
 	if dval != nil {
 		err = dsnap.DataTo(dval)
 		if err != nil {
@@ -160,6 +249,7 @@ func (t *Transaction) DeleteCollection(path string) error {
 		if err != nil {
 			return err
 		}
+		t.cacheEvict(doc.Ref.Path)
 	}
 
 	return nil
