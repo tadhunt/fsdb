@@ -4,6 +4,7 @@ import (
 	"container/list"
 	"context"
 	"fmt"
+	"time"
 
 	"cloud.google.com/go/firestore"
 	"google.golang.org/api/iterator"
@@ -29,9 +30,10 @@ type cacheEntry struct {
 const transactionCacheMax = 64
 
 type Transaction struct {
-	db     *DBConnection
-	ft     *firestore.Transaction
-	tfuncs []TransactionFunc
+	db        *DBConnection
+	ft        *firestore.Transaction
+	tfuncs    []TransactionFunc
+	startTime time.Time
 
 	// Per-attempt LRU read cache keyed by DocumentRef.Path. Firestore
 	// disallows reads after writes within a transaction, so writes only
@@ -43,13 +45,63 @@ type Transaction struct {
 	cacheMisses int
 }
 
+// TransactionStats captures observability data about a completed
+// RunTransaction call. Returned from RunTransactionStats.
+type TransactionStats struct {
+	// Elapsed is the wall-clock time from RunTransactionStats invocation
+	// to return, including any Firestore retries.
+	Elapsed time.Duration
+	// CacheHits is the number of read-cache hits in the most recent
+	// transaction attempt.
+	CacheHits int
+	// CacheMisses is the number of read-cache misses (underlying
+	// Firestore reads) in the most recent transaction attempt.
+	CacheMisses int
+}
+
 func (db *DBConnection) RunTransaction(ctx context.Context, tfuncs ...TransactionFunc) error {
+	_, err := db.RunTransactionStats(ctx, tfuncs...)
+	return err
+}
+
+// RunTransactionStats is like RunTransaction but also returns stats about
+// the completed transaction (elapsed time, cache hit/miss counts). Use it
+// at callsites you want to instrument; existing RunTransaction callers
+// stay unchanged.
+func (db *DBConnection) RunTransactionStats(ctx context.Context, tfuncs ...TransactionFunc) (TransactionStats, error) {
 	transaction := &Transaction{
-		db:     db,
-		tfuncs: tfuncs,
+		db:        db,
+		tfuncs:    tfuncs,
+		startTime: time.Now(),
 	}
 
-	return db.Client.RunTransaction(ctx, transaction.handler)
+	err := db.Client.RunTransaction(ctx, transaction.handler)
+
+	return TransactionStats{
+		Elapsed:     transaction.Elapsed(),
+		CacheHits:   transaction.CacheHits(),
+		CacheMisses: transaction.CacheMisses(),
+	}, err
+}
+
+// Elapsed returns the wall-clock time since RunTransaction was invoked.
+// Useful from inside a TransactionFunc (e.g. to bail out early or log
+// progress); the same value is reported in the final TransactionStats
+// returned by RunTransactionStats.
+func (t *Transaction) Elapsed() time.Duration {
+	return time.Since(t.startTime)
+}
+
+// CacheHits returns the number of read-cache hits in the current
+// transaction attempt.
+func (t *Transaction) CacheHits() int {
+	return t.cacheHits
+}
+
+// CacheMisses returns the number of read-cache misses (underlying
+// Firestore reads) in the current transaction attempt.
+func (t *Transaction) CacheMisses() int {
+	return t.cacheMisses
 }
 
 func (t *Transaction) handler(ctx context.Context, ft *firestore.Transaction) error {
