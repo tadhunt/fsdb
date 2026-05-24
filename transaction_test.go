@@ -16,25 +16,25 @@ type cacheTestDoc struct {
 	Value int
 }
 
-// requireTestDB connects to the FSDB_TEST_* database or fails the test.
-// Same env-var contract as TestCreateDatabase.
+// requireTestDB connects to the Firestore emulator and returns a ready-to-use
+// connection. Driven by run-with-emulator.sh, which starts an emulator and
+// exports FIRESTORE_EMULATOR_HOST before invoking `go test`. The Firestore Go
+// SDK auto-detects that env var and connects to the emulator instead of GCP;
+// no credentials needed. The project ID is arbitrary — emulators don't care.
+//
+// Skipped when FIRESTORE_EMULATOR_HOST is unset so plain `go test ./...`
+// outside the make path doesn't fatal-flunk on missing infrastructure.
 func requireTestDB(t *testing.T) (*DBConnection, context.Context) {
 	t.Helper()
-	project := os.Getenv("FSDB_TEST_PROJECT")
-	db := os.Getenv("FSDB_TEST_DB")
-	credentialsFile := os.Getenv("FSDB_TEST_CREDENTIALS_FILE")
-	if project == "" {
-		t.Fatalf("FSDB_TEST_PROJECT unset")
-	}
-	if db == "" {
-		t.Fatalf("FSDB_TEST_DB unset")
-	}
-	if credentialsFile == "" {
-		t.Fatalf("FSDB_TEST_CREDENTIALS_FILE unset")
+	if os.Getenv("FIRESTORE_EMULATOR_HOST") == "" {
+		t.Skip("FIRESTORE_EMULATOR_HOST unset; run via `make test` to spin up the emulator")
 	}
 	ctx := context.Background()
 	log := logger.NewTestCompatLogWriter(t)
-	dbc, err := NewDBConnectionWithDatabase(ctx, log, project, db, &Credentials{File: &credentialsFile})
+	// Pass an empty Credentials (not nil; credentialOptions dereferences fields
+	// without a nil-guard). With FIRESTORE_EMULATOR_HOST set, the firestore Go
+	// SDK ignores creds anyway and connects to the emulator.
+	dbc, err := NewDBConnection(ctx, log, "fsdb-test", &Credentials{})
 	if err != nil {
 		t.Fatalf("connect: %v", err)
 	}

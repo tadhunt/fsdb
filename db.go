@@ -124,6 +124,9 @@ func NewDBConnectionWithDatabase(ctx context.Context, log logger.CompatLogWriter
 }
 
 func (db *DBConnection) Add(ctx context.Context, docname string, dval interface{}) error {
+	if err := validateDocname(docname); err != nil {
+		return err
+	}
 	dref := db.Client.Doc(docname)
 	if dref == nil {
 		return db.log.ErrFmt("nil dref: bad docname '%s'?", docname)
@@ -140,6 +143,9 @@ func (db *DBConnection) Add(ctx context.Context, docname string, dval interface{
 }
 
 func (db *DBConnection) AddOrReplace(ctx context.Context, docname string, dval interface{}) error {
+	if err := validateDocname(docname); err != nil {
+		return err
+	}
 	dref := db.Client.Doc(docname)
 
 	wr, err := dref.Set(ctx, dval)
@@ -153,6 +159,9 @@ func (db *DBConnection) AddOrReplace(ctx context.Context, docname string, dval i
 }
 
 func (db *DBConnection) Delete(ctx context.Context, docname string) error {
+	if err := validateDocname(docname); err != nil {
+		return err
+	}
 	dref := db.Client.Doc(docname)
 
 	_, err := dref.Delete(ctx)
@@ -183,6 +192,9 @@ func (db *DBConnection) DeleteCollection(ctx context.Context, path string) error
 }
 
 func (db *DBConnection) Get(ctx context.Context, docname string, dval interface{}) error {
+	if err := validateDocname(docname); err != nil {
+		return err
+	}
 	dref := db.Client.Doc(docname)
 
 	dsnap, err := dref.Get(ctx)

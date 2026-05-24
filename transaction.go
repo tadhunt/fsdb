@@ -161,6 +161,9 @@ func (t *Transaction) cacheEvict(docpath string) {
 }
 
 func (t *Transaction) Add(docname string, dval interface{}) error {
+	if err := validateDocname(docname); err != nil {
+		return err
+	}
 	dref := t.db.Client.Doc(docname)
 	if dref == nil {
 		return fmt.Errorf("nil dref: bad docname '%s'?", docname)
@@ -178,6 +181,9 @@ func (t *Transaction) Add(docname string, dval interface{}) error {
 }
 
 func (t *Transaction) AddOrReplace(docname string, dval interface{}) error {
+	if err := validateDocname(docname); err != nil {
+		return err
+	}
 	dref := t.db.Client.Doc(docname)
 
 	err := t.ft.Set(dref, dval)
@@ -192,6 +198,9 @@ func (t *Transaction) AddOrReplace(docname string, dval interface{}) error {
 }
 
 func (t *Transaction) Delete(docname string) error {
+	if err := validateDocname(docname); err != nil {
+		return err
+	}
 	dref := t.db.Client.Doc(docname)
 
 	err := t.ft.Delete(dref)
@@ -204,6 +213,9 @@ func (t *Transaction) Delete(docname string) error {
 }
 
 func (t *Transaction) Get(docname string, dval interface{}) error {
+	if err := validateDocname(docname); err != nil {
+		return err
+	}
 	dref := t.db.Client.Doc(docname)
 	if dref == nil {
 		return fmt.Errorf("nil dref: bad docname '%s'?", docname)
@@ -310,6 +322,9 @@ func (t *Transaction) DeleteCollection(path string) error {
 type DBCreateFunc func(ctx context.Context, dval interface{}) error
 
 func (db *DBConnection) AtomicGetOrCreate(ctx context.Context, docname string, dval interface{}, createfunc DBCreateFunc) error {
+	if err := validateDocname(docname); err != nil {
+		return err
+	}
 	dref := db.Client.Doc(docname)
 
 	txfunc := func(ctx context.Context, tx *firestore.Transaction) error {
@@ -348,6 +363,9 @@ func (db *DBConnection) AtomicGetOrCreate(ctx context.Context, docname string, d
 type DBUpdateFunc func(ctx context.Context, dval interface{}) error
 
 func (db *DBConnection) AtomicUpdate(ctx context.Context, docname string, dval interface{}, updateFunc DBUpdateFunc) error {
+	if err := validateDocname(docname); err != nil {
+		return err
+	}
 	dref := db.Client.Doc(docname)
 
 	txfunc := func(ctx context.Context, tx *firestore.Transaction) error {
