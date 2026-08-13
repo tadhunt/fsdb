@@ -30,11 +30,60 @@ type Index struct {
 	Fields          []IndexField `json:"fields"`
 }
 
+// FieldOverrideIndex is one index of a single-field index control. Unlike a
+// composite index, the field is named once by the enclosing FieldOverride, so
+// an entry says only how that field is indexed, and at what scope.
+//
+// QueryScope carries more weight here than it does for a composite index:
+// Firestore indexes every field at collection scope on its own, so the usual
+// reason to declare an override is to add COLLECTION_GROUP scope, which a
+// collection group query requires and which is never created automatically.
+type FieldOverrideIndex struct {
+	Order       string     `json:"order,omitempty"`
+	ArrayConfig string     `json:"arrayConfig,omitempty"`
+	QueryScope  QueryScope `json:"queryScope,omitempty"`
+}
+
 // FieldOverride defines a single-field index override.
 type FieldOverride struct {
-	CollectionGroup string       `json:"collectionGroup"`
-	FieldPath       string       `json:"fieldPath"`
-	Indexes         []IndexField `json:"indexes"`
+	CollectionGroup string               `json:"collectionGroup"`
+	FieldPath       string               `json:"fieldPath"`
+	Indexes         []FieldOverrideIndex `json:"indexes"`
+}
+
+// NewFieldOverride creates a single-field index control for the named field.
+func NewFieldOverride(collectionGroup string, fieldPath string) *FieldOverride {
+	return &FieldOverride{
+		CollectionGroup: collectionGroup,
+		FieldPath:       fieldPath,
+	}
+}
+
+// Asc adds an ascending index at the given scope.
+func (f *FieldOverride) Asc(scope QueryScope) *FieldOverride {
+	f.Indexes = append(f.Indexes, FieldOverrideIndex{
+		Order:      "ASCENDING",
+		QueryScope: scope,
+	})
+	return f
+}
+
+// Desc adds a descending index at the given scope.
+func (f *FieldOverride) Desc(scope QueryScope) *FieldOverride {
+	f.Indexes = append(f.Indexes, FieldOverrideIndex{
+		Order:      "DESCENDING",
+		QueryScope: scope,
+	})
+	return f
+}
+
+// ArrayContains adds an array-contains index at the given scope.
+func (f *FieldOverride) ArrayContains(scope QueryScope) *FieldOverride {
+	f.Indexes = append(f.Indexes, FieldOverrideIndex{
+		ArrayConfig: "CONTAINS",
+		QueryScope:  scope,
+	})
+	return f
 }
 
 // IndexSet is a collection of indexes and field overrides that serializes

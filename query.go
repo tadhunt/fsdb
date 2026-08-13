@@ -21,33 +21,45 @@ const (
 //
 // Example:
 //
-//	iter := db.Query("users").
+//	iter := db.Query(ctx, "users").
 //		Where("age", ">=", 18).
 //		OrderBy("age", fsdb.Asc).
 //		Limit(10).
-//		Documents(ctx)
+//		Documents()
+//
+// The context belongs to the query rather than to Documents because a
+// transaction-scoped query has no use for one: the transaction already carries
+// its own, and Firestore's transactional read takes no context. Asking for it
+// at execution time would mean asking for something half the callers cannot
+// supply meaningfully.
 type Query struct {
 	query firestore.Query
 	tx    *firestore.Transaction
+
+	// Only set, and only used, for queries that run outside a transaction.
+	ctx context.Context
 }
 
 // Query creates a new query builder for the named collection.
-func (db *DBConnection) Query(colname string) *Query {
+func (db *DBConnection) Query(ctx context.Context, colname string) *Query {
 	return &Query{
 		query: db.Client.Collection(colname).Query,
+		ctx:   ctx,
 	}
 }
 
 // QueryGroup creates a new query builder for a collection group.
 // A collection group includes all collections with the given ID,
 // regardless of their parent document.
-func (db *DBConnection) QueryGroup(colname string) *Query {
+func (db *DBConnection) QueryGroup(ctx context.Context, colname string) *Query {
 	return &Query{
 		query: db.Client.CollectionGroup(colname).Query,
+		ctx:   ctx,
 	}
 }
 
-// Query creates a new query builder for the named collection within a transaction.
+// Query creates a new query builder for the named collection within a
+// transaction. No context: the transaction supplies it.
 func (t *Transaction) Query(colname string) *Query {
 	return &Query{
 		query: t.db.Client.Collection(colname).Query,
@@ -55,7 +67,8 @@ func (t *Transaction) Query(colname string) *Query {
 	}
 }
 
-// QueryGroup creates a new query builder for a collection group within a transaction.
+// QueryGroup creates a new query builder for a collection group within a
+// transaction. No context: the transaction supplies it.
 func (t *Transaction) QueryGroup(colname string) *Query {
 	return &Query{
 		query: t.db.Client.CollectionGroup(colname).Query,
@@ -133,9 +146,9 @@ func (q *Query) Select(fields ...string) *Query {
 }
 
 // Documents executes the query and returns a DocumentIterator over the results.
-func (q *Query) Documents(ctx context.Context) *DocumentIterator {
+func (q *Query) Documents() *DocumentIterator {
 	if q.tx != nil {
 		return &DocumentIterator{q.tx.Documents(q.query)}
 	}
-	return &DocumentIterator{q.query.Documents(ctx)}
+	return &DocumentIterator{q.query.Documents(q.ctx)}
 }
